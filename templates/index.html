@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Multi QR Code Reader</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .card {
+            width: 420px;
+            background: #fff;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .card h2 {
+            margin-bottom: 10px;
+            color: #444;
+        }
+
+        .card p {
+            font-size: 14px;
+            color: #777;
+        }
+
+        .drop-zone {
+            margin-top: 20px;
+            border: 2px dashed #aaa;
+            border-radius: 12px;
+            padding: 30px 20px;
+            cursor: pointer;
+            transition: 0.3s;
+            background: #fafafa;
+        }
+
+        .drop-zone.dragover {
+            border-color: #667eea;
+            background: #f0f3ff;
+        }
+
+        .drop-zone img {
+            max-width: 100%;
+            margin-top: 10px;
+            border-radius: 10px;
+        }
+
+        .result {
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .result h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .result ul {
+            padding-left: 20px;
+        }
+
+        .result li {
+            background: #f4f6fb;
+            padding: 8px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-family: monospace;
+        }
+
+        .footer {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>📷 Multi QR Reader</h2>
+    <p>Kéo & thả ảnh chứa nhiều QR Code</p>
+
+    <div class="drop-zone" id="dropZone">
+        <strong>Thả ảnh vào đây</strong>
+        <br>
+        <small>(PNG / JPG)</small>
+        <img id="preview" style="display:none;">
+    </div>
+
+    <div class="result" id="result"></div>
+
+    <div class="footer">
+        AI Image Processing Demo
+    </div>
+</div>
+
+<script>
+const dropZone = document.getElementById("dropZone");
+const preview = document.getElementById("preview");
+const result = document.getElementById("result");
+
+["dragenter", "dragover"].forEach(event => {
+    dropZone.addEventListener(event, e => {
+        e.preventDefault();
+        dropZone.classList.add("dragover");
+    });
+});
+
+["dragleave", "drop"].forEach(event => {
+    dropZone.addEventListener(event, e => {
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+    });
+});
+
+dropZone.addEventListener("drop", e => {
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+
+    // Preview ảnh
+    const reader = new FileReader();
+    reader.onload = () => {
+        preview.src = reader.result;
+        preview.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+
+    // Upload ảnh
+    const formData = new FormData();
+    formData.append("image", file);
+
+    fetch("/upload", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            result.innerHTML = `<p style="color:red">${data.error}</p>`;
+            return;
+        }
+
+        let html = `<h3>🔍 Phát hiện ${data.count} QR</h3><ul>`;
+        data.data.forEach(qr => {
+            html += `<li>${qr}</li>`;
+        });
+        html += "</ul>";
+
+        result.innerHTML = html;
+    });
+});
+</script>
+
+</body>
+</html>
