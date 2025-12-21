@@ -1,40 +1,42 @@
-from flask import Flask, render_template, request, jsonify
+import streamlit as st
 import cv2
 import numpy as np
-from pyzbar.pyzbar import decode
+from PIL import Image
 
-app = Flask(__name__)
+st.set_page_config(
+    page_title="Multi QR Decoder",
+    page_icon="🔍",
+    layout="centered"
+)
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+st.title("🔍 Đọc nhiều QR Code trong 1 ảnh")
 
-@app.route("/upload", methods=["POST"])
-def upload():
-    if "image" not in request.files:
-        return jsonify({"error": "No image uploaded"}), 400
+st.write("Kéo thả ảnh vào, hệ thống sẽ tự động đọc tất cả QR trong ảnh.")
 
-    file = request.files["image"]
-    image_bytes = file.read()
+uploaded_file = st.file_uploader(
+    "Chọn ảnh",
+    type=["jpg", "jpeg", "png"]
+)
 
-    # Chuyển bytes → OpenCV image
-    npimg = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+def decode_qr(image):
+    detector = cv2.QRCodeDetector()
+    retval, decoded_info, points, _ = detector.detectAndDecodeMulti(image)
 
-    if img is None:
-        return jsonify({"error": "Invalid image"}), 400
+    if retval:
+        return [text for text in decoded_info if text]
+    return []
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    qr_codes = decode(gray)
+if uploaded_file:
+    image = Image.open(uploaded_file).convert("RGB")
+    img_np = np.array(image)
 
-    results = []
-    for qr in qr_codes:
-        results.append(qr.data.decode("utf-8"))
+    st.image(image, caption="Ảnh đã upload", use_container_width=True)
 
-    return jsonify({
-        "count": len(results),
-        "data": results
-    })
+    results = decode_qr(img_np)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    if results:
+        st.success(f"✅ Phát hiện {len(results)} QR:")
+        for i, r in enumerate(results, 1):
+            st.write(f"**{i}.** {r}")
+    else:
+        st.warning("❌ Không phát hiện QR nào trong ảnh")
