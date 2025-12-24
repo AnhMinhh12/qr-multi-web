@@ -2,41 +2,54 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
+from pyzbar.pyzbar import decode # Thư viện mạnh mẽ hơn cho pallet
 
-st.set_page_config(
-    page_title="Multi QR Decoder",
-    page_icon="🔍",
-    layout="centered"
-)
+st.set_page_config(page_title="Pallet QR Scanner", layout="wide")
 
-st.title("🔍 Đọc nhiều QR Code trong 1 ảnh")
+st.title("📦 Hệ thống quét QR Pallet Hàng")
 
-st.write("Kéo thả ảnh vào, hệ thống sẽ tự động đọc tất cả QR trong ảnh.")
+# 1. Chế độ lấy ảnh từ Camera
+img_file_buffer = st.camera_input("Chụp ảnh pallet hàng")
 
-uploaded_file = st.file_uploader(
-    "Chọn ảnh",
-    type=["jpg", "jpeg", "png"]
-)
+def process_pallet(image_np):
+    # Chuyển sang ảnh xám để tăng tốc độ nhận diện
+    gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+    
+    # Giải mã bằng pyzbar
+    barcodes = decode(gray)
+    
+    results = []
+    for barcode in barcodes:
+        # Lấy nội dung QR
+        data = barcode.data.decode("utf-8")
+        # Lấy vị trí khung hình chữ nhật
+        (x, y, w, h) = barcode.rect
+        # Vẽ khung xanh lên ảnh gốc
+        cv2.rectangle(image_np, (x, y), (x + w, y + h), (0, 255, 0), 5)
+        results.append(data)
+        
+    return image_np, results
 
-def decode_qr(image):
-    detector = cv2.QRCodeDetector()
-    retval, decoded_info, points, _ = detector.detectAndDecodeMulti(image)
+if img_file_buffer:
+    # Chuyển buffer thành ảnh numpy
+    img = Image.open(img_file_buffer)
+    img_np = np.array(img)
 
-    if retval:
-        return [text for text in decoded_info if text]
-    return []
+    # Xử lý
+    processed_img, qr_list = process_pallet(img_np)
 
-if uploaded_file:
-    image = Image.open(uploaded_file).convert("RGB")
-    img_np = np.array(image)
+    # Hiển thị kết quả
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.image(processed_img, caption="Vị trí QR trên Pallet", use_container_width=True)
 
-    st.image(image, caption="Ảnh đã upload", use_container_width=True)
-
-    results = decode_qr(img_np)
-
-    if results:
-        st.success(f"✅ Phát hiện {len(results)} QR:")
-        for i, r in enumerate(results, 1):
-            st.write(f"**{i}.** {r}")
-    else:
-        st.warning("❌ Không phát hiện QR nào trong ảnh")
+    with col2:
+        st.subheader(f"📊 Tổng: {len(qr_list)} mã")
+        if qr_list:
+            # Loại bỏ trùng lặp nếu cần
+            unique_qrs = list(set(qr_list))
+            for i, code in enumerate(unique_qrs, 1):
+                st.info(f"**{i}.** {code}")
+        else:
+            st.warning("Không tìm thấy mã nào. Hãy thử lại gần hơn.")
